@@ -1,0 +1,104 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A registered user profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User ID" },
+        "displayName": { "type": "string", "description": "User's display name" },
+        "photoURL": { "type": "string", "description": "User's profile picture URL" },
+        "email": { "type": "string", "description": "User's email address" },
+        "status": { "type": "string", "description": "User's current status message" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "lastSeen": { "type": "timestamp", "description": "Last time user was active" },
+        "isOnline": { "type": "boolean", "description": "Whether the user is currently online" },
+        "blockedUsers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Array of user UIDs blocked by this user"
+        }
+      },
+      "required": ["uid", "displayName", "email"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "A conversation between users",
+      "type": "object",
+      "properties": {
+        "participants": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Array of user UIDs"
+        },
+        "lastMessage": { "type": "string" },
+        "lastMessageTime": { "type": "timestamp" },
+        "typing": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Array of user UIDs currently typing"
+        }
+      },
+      "required": ["participants"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A message within a chat",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "timestamp" },
+        "type": { "type": "string", "enum": ["text", "location"] },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        }
+      },
+      "required": ["chatId", "senderId", "timestamp", "type"]
+    },
+    "Ad": {
+      "title": "Ad",
+      "description": "A marketplace advertisement or service listing",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["buy", "sell", "give", "service_offer", "service_request"] },
+        "price": { "type": "string" },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["authorId", "authorName", "title", "description", "type", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/chats/{chatId}": {
+      "schema": "Chat",
+      "description": "Chat conversations"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages in a chat"
+    },
+    "/ads/{adId}": {
+      "schema": "Ad",
+      "description": "Marketplace ads"
+    }
+  }
+}

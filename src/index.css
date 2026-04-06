@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+/* Leaflet Dark Theme Overrides */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: #18181b !important; /* zinc-900 */
+  color: #f4f4f5 !important; /* zinc-100 */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3) !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: #a1a1aa !important; /* zinc-400 */
+  padding: 4px 4px 0 0 !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #f4f4f5 !important; /* zinc-100 */
+}
+
+/* Make map tiles slightly darker to match theme */
+.leaflet-layer,
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out,
+.leaflet-control-attribution {
+  filter: brightness(0.8) contrast(1.2);
+}
+
+.leaflet-bar a {
+  background-color: #18181b !important;
+  color: #10b981 !important;
+  border-bottom-color: #27272a !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: #27272a !important;
+}

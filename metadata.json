@@ -1,0 +1,5 @@
+{
+  "name": "ConnectChat",
+  "description": "Online chat application with user profiles, statuses, and location sharing.",
+  "requestFramePermissions": ["geolocation"]
+}

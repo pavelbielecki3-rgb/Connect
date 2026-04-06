@@ -1,0 +1,194 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - displayName: string (required)
+    //   - email: string (required)
+    //   - photoURL: string (optional)
+    //   - status: string (optional)
+    //   - location: map (optional) { lat: number, lng: number }
+    //   - lastSeen: timestamp (optional)
+    //   - isOnline: boolean (optional)
+    //   - blockedUsers: list of strings (optional)
+    //
+    // Collection: chats
+    // Document ID: {chatId}
+    // Fields:
+    //   - participants: list of strings (required)
+    //   - lastMessage: string (optional)
+    //   - lastMessageTime: timestamp (optional)
+    //
+    // Collection: chats/{chatId}/messages
+    // Document ID: {messageId}
+    // Fields:
+    //   - chatId: string (required)
+    //   - senderId: string (required)
+    //   - text: string (optional)
+    //   - timestamp: timestamp (required)
+    //   - type: string (required) ['text', 'location']
+    //   - location: map (optional) { lat: number, lng: number }
+    //
+    // Collection: ads
+    // Document ID: {adId}
+    // Fields:
+    //   - authorId: string (required)
+    //   - authorName: string (required)
+    //   - title: string (required)
+    //   - description: string (required)
+    //   - type: string (required) ['buy', 'sell', 'give', 'service_offer', 'service_request']
+    //   - price: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+             request.resource.data[field].size() >= minLen &&
+             request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalStringLength(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    function isParticipant(chatId) {
+      let chat = get(/databases/$(database)/documents/chats/$(chatId));
+      return chat != null && request.auth.uid in chat.data.participants;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser() {
+      return hasRequiredFields(['uid', 'displayName', 'email']) &&
+             request.resource.data.uid is string &&
+             isValidStringLength('displayName', 1, 100) &&
+             isValidStringLength('email', 3, 150) &&
+             isValidOptionalStringLength('photoURL', 0, 100000) &&
+             isValidOptionalStringLength('status', 0, 200) &&
+             isValidOptionalStringLength('gender', 0, 20) &&
+             (!('location' in request.resource.data) || (request.resource.data.location is map && 'lat' in request.resource.data.location && 'lng' in request.resource.data.location && request.resource.data.location.lat is number && request.resource.data.location.lng is number)) &&
+             (!('lastSeen' in request.resource.data) || request.resource.data.lastSeen is timestamp) &&
+             (!('isOnline' in request.resource.data) || request.resource.data.isOnline is bool) &&
+             (!('blockedUsers' in request.resource.data) || request.resource.data.blockedUsers is list);
+    }
+
+    function isNotBlocked(chatId) {
+      let chat = get(/databases/$(database)/documents/chats/$(chatId));
+      let otherUserId = chat.data.participants[0] == request.auth.uid ? chat.data.participants[1] : chat.data.participants[0];
+      let otherUser = get(/databases/$(database)/documents/users/$(otherUserId));
+      let currentUser = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      let iAmBlocked = otherUser != null && 'blockedUsers' in otherUser.data && request.auth.uid in otherUser.data.blockedUsers;
+      let iBlockedThem = currentUser != null && 'blockedUsers' in currentUser.data && otherUserId in currentUser.data.blockedUsers;
+      return !iAmBlocked && !iBlockedThem;
+    }
+
+    function isValidChat() {
+      return hasRequiredFields(['participants']) &&
+             request.resource.data.participants is list &&
+             request.resource.data.participants.size() >= 2 &&
+             request.resource.data.participants.size() <= 10 &&
+             request.auth.uid in request.resource.data.participants &&
+             isValidOptionalStringLength('lastMessage', 0, 1000) &&
+             (!('lastMessageTime' in request.resource.data) || request.resource.data.lastMessageTime is timestamp) &&
+             (!('typing' in request.resource.data) || request.resource.data.typing is list);
+    }
+
+    function isValidMessage(chatId) {
+      return hasRequiredFields(['chatId', 'senderId', 'timestamp', 'type']) &&
+             request.resource.data.chatId == chatId &&
+             request.resource.data.senderId == request.auth.uid &&
+             request.resource.data.timestamp is timestamp &&
+             request.resource.data.type in ['text', 'location'] &&
+             isValidOptionalStringLength('text', 0, 2000) &&
+             (!('location' in request.resource.data) || (request.resource.data.location is map && 'lat' in request.resource.data.location && 'lng' in request.resource.data.location && request.resource.data.location.lat is number && request.resource.data.location.lng is number)) &&
+             isNotBlocked(chatId);
+    }
+
+    function isValidAd() {
+      return hasRequiredFields(['authorId', 'authorName', 'title', 'description', 'type', 'createdAt']) &&
+             request.resource.data.authorId == request.auth.uid &&
+             request.resource.data.authorName is string &&
+             isValidStringLength('title', 1, 100) &&
+             isValidStringLength('description', 1, 2000) &&
+             request.resource.data.type in ['buy', 'sell', 'give', 'service_offer', 'service_request'] &&
+             isValidOptionalStringLength('price', 0, 100) &&
+             request.resource.data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Allow reading all users to show the people list.
+      // In a real app with PII, we'd split public/private profiles.
+      // Here we assume the whole profile is public to other authenticated users.
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser() && uidUnchanged();
+      allow update: if isOwner(userId) && isValidUser() && uidNotModified();
+      allow delete: if false;
+    }
+
+    match /ads/{adId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidAd();
+      allow update: if false;
+      allow delete: if isAuthenticated() && resource.data.authorId == request.auth.uid;
+    }
+
+    match /chats/{chatId} {
+      // Users can read chats they are part of
+      allow read: if isAuthenticated() && request.auth.uid in resource.data.participants;
+      // Users can create a chat if they are in the participants list
+      allow create: if isAuthenticated() && isValidChat();
+      // Users can update a chat (e.g., lastMessage) if they are a participant
+      allow update: if isAuthenticated() && request.auth.uid in resource.data.participants && isValidChat();
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        // Users can read messages in chats they are part of
+        allow read: if isAuthenticated() && isParticipant(chatId);
+        // Users can create messages in chats they are part of
+        allow create: if isAuthenticated() && isParticipant(chatId) && isValidMessage(chatId);
+        allow update, delete: if false;
+      }
+    }
+  }
+}
