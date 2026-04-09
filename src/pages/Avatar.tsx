@@ -83,6 +83,8 @@ export default function Avatar() {
   const navigate = useNavigate();
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [purchaseConfirmPkg, setPurchaseConfirmPkg] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
   
   const currentPackage = userProfile?.avatarPackage || 'none';
   const [config, setConfig] = useState({
@@ -96,25 +98,32 @@ export default function Avatar() {
     }
   }, [userProfile]);
 
-  const handlePurchase = async (pkgId: string) => {
-    if (!user) return;
-    // Simulace platební brány
-    const confirm = window.confirm(`Přejete si zakoupit ${PACKAGES.find(p => p.id === pkgId)?.name} za ${PACKAGES.find(p => p.id === pkgId)?.price}€? (Toto je simulace platby)`);
-    if (!confirm) return;
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
 
+  const handlePurchaseClick = (pkgId: string) => {
+    setPurchaseConfirmPkg(pkgId);
+  };
+
+  const confirmPurchase = async () => {
+    if (!user || !purchaseConfirmPkg) return;
+    
     setIsPurchasing(true);
     try {
       await updateDoc(doc(db, 'users', user.uid), {
-        avatarPackage: pkgId,
+        avatarPackage: purchaseConfirmPkg,
         avatarConfig: { clothes: 'tshirt', hair: 'none' } // reset to defaults of new package
       });
       setConfig({ clothes: 'tshirt', hair: 'none' });
-      alert('Nákup byl úspěšný! Nyní si můžete upravit svého avatara.');
+      showNotification('Nákup byl úspěšný! Nyní si můžete upravit svého avatara.', 'success');
     } catch (error) {
       console.error('Chyba při nákupu:', error);
-      alert('Nákup se nezdařil.');
+      showNotification('Nákup se nezdařil.', 'error');
     }
     setIsPurchasing(false);
+    setPurchaseConfirmPkg(null);
   };
 
   const saveAvatar = async () => {
@@ -124,9 +133,10 @@ export default function Avatar() {
       await updateDoc(doc(db, 'users', user.uid), {
         avatarConfig: config
       });
-      alert('Avatar byl úspěšně uložen!');
+      showNotification('Avatar byl úspěšně uložen!', 'success');
     } catch (error) {
       console.error('Chyba při ukládání:', error);
+      showNotification('Chyba při ukládání avatara.', 'error');
     }
     setIsSaving(false);
   };
@@ -135,8 +145,42 @@ export default function Avatar() {
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-md mx-auto bg-zinc-950 min-h-full pb-20"
+      className="max-w-md mx-auto bg-zinc-950 min-h-full pb-20 relative"
     >
+      {notification && (
+        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 rounded-full shadow-lg text-sm font-medium ${
+          notification.type === 'success' ? 'bg-emerald-500 text-zinc-950' : 'bg-red-500 text-white'
+        }`}>
+          {notification.message}
+        </div>
+      )}
+
+      {purchaseConfirmPkg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-zinc-900 w-full max-w-sm rounded-xl overflow-hidden shadow-2xl border border-zinc-800 p-6">
+            <h3 className="text-lg font-bold text-zinc-100 mb-2">Potvrzení nákupu</h3>
+            <p className="text-zinc-400 text-sm mb-6">
+              Přejete si zakoupit {PACKAGES.find(p => p.id === purchaseConfirmPkg)?.name} za {PACKAGES.find(p => p.id === purchaseConfirmPkg)?.price}€? (Toto je simulace platby)
+            </p>
+            <div className="flex space-x-3">
+              <button 
+                onClick={() => setPurchaseConfirmPkg(null)}
+                className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-lg transition-colors"
+              >
+                Zrušit
+              </button>
+              <button 
+                onClick={confirmPurchase}
+                disabled={isPurchasing}
+                className="flex-1 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isPurchasing ? 'Zpracovávám...' : 'Potvrdit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="px-4 py-5 border-b border-zinc-800 bg-zinc-900 sticky top-0 z-10 flex items-center">
         <button onClick={() => navigate(-1)} className="mr-3 text-zinc-400 hover:text-zinc-200 transition-colors">
           <ArrowLeft className="h-6 w-6" />
@@ -174,7 +218,7 @@ export default function Avatar() {
                   </ul>
 
                   <button
-                    onClick={() => handlePurchase(pkg.id)}
+                    onClick={() => handlePurchaseClick(pkg.id)}
                     disabled={isPurchasing}
                     className={`w-full py-2.5 rounded-lg font-medium flex items-center justify-center transition-colors ${
                       pkg.id === 'premium' ? 'bg-amber-500 hover:bg-amber-400 text-zinc-950' : 

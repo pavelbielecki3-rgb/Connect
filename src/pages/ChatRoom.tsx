@@ -364,17 +364,57 @@ export default function ChatRoom() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg) => {
+      <div className="flex-1 overflow-y-auto p-4 space-y-1">
+        {messages.map((msg, index) => {
           const isMe = msg.senderId === user?.uid;
+          const prevMsg = messages[index - 1];
+          const nextMsg = messages[index + 1];
+          
+          const isFirstInGroup = !prevMsg || prevMsg.senderId !== msg.senderId;
+          const isLastInGroup = !nextMsg || nextMsg.senderId !== msg.senderId;
+          
+          let borderRadiusClass = 'rounded-2xl';
+          if (isMe) {
+            if (!isFirstInGroup && !isLastInGroup) borderRadiusClass = 'rounded-2xl rounded-tr-sm rounded-br-sm';
+            else if (!isFirstInGroup && isLastInGroup) borderRadiusClass = 'rounded-2xl rounded-tr-sm';
+            else if (isFirstInGroup && !isLastInGroup) borderRadiusClass = 'rounded-2xl rounded-br-sm';
+          } else {
+            if (!isFirstInGroup && !isLastInGroup) borderRadiusClass = 'rounded-2xl rounded-tl-sm rounded-bl-sm';
+            else if (!isFirstInGroup && isLastInGroup) borderRadiusClass = 'rounded-2xl rounded-tl-sm';
+            else if (isFirstInGroup && !isLastInGroup) borderRadiusClass = 'rounded-2xl rounded-bl-sm';
+          }
+
+          const showTimestamp = isLastInGroup && msg.timestamp;
+
           return (
-            <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[75%] rounded-lg px-4 py-2 ${isMe ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-100'}`}>
+            <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} ${isFirstInGroup && index !== 0 ? 'mt-4' : ''}`}>
+              {!isMe && (
+                <div className="w-8 h-8 flex-shrink-0 mr-2 flex items-end">
+                  {isLastInGroup && otherUser ? (
+                    otherUser.avatarPackage && otherUser.avatarPackage !== 'none' && otherUser.avatarConfig ? (
+                      <div className="w-8 h-8 rounded-full ring-1 ring-zinc-800 overflow-hidden bg-zinc-800">
+                        <AvatarDisplay config={otherUser.avatarConfig} size={32} />
+                      </div>
+                    ) : (
+                      <img 
+                        className="w-8 h-8 rounded-full object-cover ring-1 ring-zinc-800" 
+                        src={otherUser.photoURL || 'https://via.placeholder.com/150'} 
+                        alt="" 
+                        referrerPolicy="no-referrer"
+                      />
+                    )
+                  ) : (
+                    <div className="w-8 h-8" />
+                  )}
+                </div>
+              )}
+              
+              <div className={`max-w-[75%] px-4 py-2 ${borderRadiusClass} ${isMe ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-zinc-950 shadow-sm' : 'bg-zinc-800 text-zinc-100'}`}>
                 {msg.type === 'text' ? (
-                  <p className="text-sm">{msg.text}</p>
+                  <p className="text-[15px] leading-snug">{msg.text}</p>
                 ) : msg.type === 'image' ? (
                   <div className="text-sm">
-                    <img src={msg.imageUrl} alt="Obrázek" className="rounded-md max-w-full h-auto mt-1" />
+                    <img src={msg.imageUrl} alt="Obrázek" className="rounded-md max-w-full h-auto" />
                   </div>
                 ) : msg.type === 'poll' ? (
                   <div className="text-sm w-full min-w-[200px]">
@@ -392,10 +432,10 @@ export default function ChatRoom() {
                           <div 
                             key={idx} 
                             onClick={() => handleVote(msg.id, idx)}
-                            className={`relative overflow-hidden rounded-md border p-2 cursor-pointer transition-colors ${hasVoted ? (isMe ? 'border-white bg-emerald-700' : 'border-emerald-500 bg-zinc-700') : (isMe ? 'border-emerald-400 hover:bg-emerald-500' : 'border-zinc-600 hover:bg-zinc-700')}`}
+                            className={`relative overflow-hidden rounded-md border p-2 cursor-pointer transition-colors ${hasVoted ? (isMe ? 'border-zinc-950 bg-emerald-600' : 'border-emerald-500 bg-zinc-700') : (isMe ? 'border-emerald-600 hover:bg-emerald-600' : 'border-zinc-600 hover:bg-zinc-700')}`}
                           >
                             <div 
-                              className={`absolute left-0 top-0 bottom-0 opacity-20 ${isMe ? 'bg-white' : 'bg-emerald-500'}`} 
+                              className={`absolute left-0 top-0 bottom-0 opacity-20 ${isMe ? 'bg-zinc-950' : 'bg-emerald-500'}`} 
                               style={{ width: `${percentage}%` }}
                             />
                             <div className="relative flex justify-between items-center z-10">
@@ -425,8 +465,8 @@ export default function ChatRoom() {
                     )}
                   </div>
                 )}
-                {msg.timestamp && (
-                  <p className={`text-[10px] mt-1 text-right ${isMe ? 'text-emerald-200' : 'text-zinc-400'}`}>
+                {showTimestamp && (
+                  <p className={`text-[10px] mt-1 text-right ${isMe ? 'text-emerald-900/70' : 'text-zinc-500'}`}>
                     {msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 )}
@@ -446,37 +486,39 @@ export default function ChatRoom() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="bg-zinc-900 px-4 py-3 border-t border-zinc-800">
+      <div className="bg-zinc-950 px-4 py-3 border-t border-zinc-800">
         {isBlocked ? (
           <div className="text-center py-2 text-sm text-zinc-500">
             {isBlockedByMe ? "Zablokovali jste tohoto uživatele." : "Tento uživatel si nepřeje přijímat zprávy."}
           </div>
         ) : (
-          <form onSubmit={sendMessage} className="flex space-x-2 items-center">
-            <button
-              type="button"
-              onClick={sendLocation}
-              className="inline-flex items-center justify-center p-2 rounded-full text-zinc-400 hover:bg-zinc-800 focus:outline-none transition-colors"
-              title="Sdílet polohu"
-            >
-              <MapPin className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center justify-center p-2 rounded-full text-zinc-400 hover:bg-zinc-800 focus:outline-none transition-colors"
-              title="Odeslat obrázek"
-            >
-              <ImageIcon className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsPollModalOpen(true)}
-              className="inline-flex items-center justify-center p-2 rounded-full text-zinc-400 hover:bg-zinc-800 focus:outline-none transition-colors"
-              title="Vytvořit anketu"
-            >
-              <BarChart2 className="h-5 w-5" />
-            </button>
+          <form onSubmit={sendMessage} className="flex space-x-2 items-end">
+            <div className="flex space-x-1 pb-1">
+              <button
+                type="button"
+                onClick={sendLocation}
+                className="p-2 rounded-full text-emerald-500 hover:bg-zinc-900 focus:outline-none transition-colors"
+                title="Sdílet polohu"
+              >
+                <MapPin className="h-6 w-6" />
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2 rounded-full text-emerald-500 hover:bg-zinc-900 focus:outline-none transition-colors"
+                title="Odeslat obrázek"
+              >
+                <ImageIcon className="h-6 w-6" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPollModalOpen(true)}
+                className="p-2 rounded-full text-emerald-500 hover:bg-zinc-900 focus:outline-none transition-colors"
+                title="Vytvořit anketu"
+              >
+                <BarChart2 className="h-6 w-6" />
+              </button>
+            </div>
             <input 
               type="file" 
               ref={fileInputRef} 
@@ -484,20 +526,31 @@ export default function ChatRoom() {
               accept="image/*" 
               className="hidden" 
             />
-            <input
-              type="text"
-              value={newMessage}
-              onChange={handleTyping}
-              placeholder="Napište zprávu..."
-              className="flex-1 focus:ring-emerald-500 focus:border-emerald-500 block w-full rounded-full sm:text-sm border-zinc-700 px-4 py-2 bg-zinc-800 text-zinc-100 placeholder-zinc-500"
-            />
-            <button
-              type="submit"
-              disabled={!newMessage.trim()}
-              className="inline-flex items-center justify-center p-2 rounded-full text-zinc-950 bg-emerald-500 hover:bg-emerald-400 focus:outline-none disabled:opacity-50 transition-colors"
-            >
-              <Send className="h-5 w-5" />
-            </button>
+            <div className="flex-1 relative">
+              <textarea
+                value={newMessage}
+                onChange={(e: any) => handleTyping(e)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage(e);
+                  }
+                }}
+                placeholder="Napište zprávu..."
+                className="block w-full rounded-3xl sm:text-[15px] border-0 px-4 py-2.5 bg-zinc-900 text-zinc-100 placeholder-zinc-500 focus:ring-0 resize-none max-h-32"
+                rows={1}
+                style={{ minHeight: '44px' }}
+              />
+            </div>
+            <div className="pb-1">
+              <button
+                type="submit"
+                disabled={!newMessage.trim()}
+                className="p-2 rounded-full text-emerald-500 hover:bg-zinc-900 focus:outline-none disabled:opacity-50 transition-colors"
+              >
+                <Send className="h-6 w-6" />
+              </button>
+            </div>
           </form>
         )}
       </div>
